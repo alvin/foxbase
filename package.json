@@ -1,0 +1,30 @@
+{
+  "name": "foxbase",
+  "version": "0.0.3",
+  "description": "A lightweight model/lifecycle engine for Google's Firebase. Includes child relationships and blob associations (i.e. for images/attachements)",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "babel src --out-dir lib",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alvin/foxbase.git"
+  },
+  "keywords": [
+    "firebase",
+    "model",
+    "relationship",
+    "images"
+  ],
+  "author": "Alvin Engler / @englr",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alvin/foxbase/issues"
+  },
+  "homepage": "https://github.com/alvin/foxbase#readme",
+  "devDependencies": {
+    "babel-cli": "^6.22.2",
+    "babel-preset-es2015": "^6.22.0"
+  }
+}
