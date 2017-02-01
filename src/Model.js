@@ -21,7 +21,7 @@ export default class Model {
   isNested() { return typeof(this.options) == "object" && this.options.nested };
   
   write(parentId, itemId, obj, blobs) {    
-    console.log('write() input: ', parentId, itemId, obj, blobs);
+    //console.log('write() input: ', parentId, itemId, obj, blobs);
     
     if (!parentId || !itemId || typeof(parentId) != 'string' || ( typeof(obj) != 'object' && typeof(obj) != 'null' ) || typeof(itemId) != 'string' ) return Promise.reject('Invalid input provided to write()')        
     else return firebase.database().ref(this.itemLocation(parentId, itemId)).set(obj).then(() => {
@@ -48,8 +48,7 @@ export default class Model {
   };
   
   create(parentId, obj, blobs) {
-    var newId = firebase.database().ref().child(this.parentLocation(parentId)).push().key;
-    console.log(this, 'newId:', newId);
+    var newId = obj.id || firebase.database().ref().child(this.parentLocation(parentId)).push().key;
     
     if (typeof(obj) == "object") {
       if (typeof(this.options) == 'object') {
@@ -62,7 +61,6 @@ export default class Model {
         };
       }
     };
-    console.log("Class Name: ", this.constructor.name);
     
     if (this.constructor.name == 'Model') return this.write(parentId, newId, obj, blobs).then((result) => {
       return newId
