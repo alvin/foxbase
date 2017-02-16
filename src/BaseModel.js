@@ -52,15 +52,33 @@ export default class BaseModel extends Model {
     
     if (!currentUser) return Promise.resolve('Not authenticated')  
     else {
+      var groupIds = []
       var groups = {};
       
       return firebase.database().ref('/users-' + this.modelName +'/' + currentUser.uid).once('value')
         .then((snapshot) => {
-          var groupIds = snapshot.val();
-        
-          if (!_.size(groupIds)) return Promise.resolve('No user accounts');
+          var userGroupIds = snapshot.val();
+          //console.log('userGroupIds', userGroupIds);
+          if (userGroupIds) Object.keys(userGroupIds).forEach((groupId) => {
+            groupIds.push(groupId);
+          });
+        })
+        .then(() => {
+          var userEmailDomain = firebase.auth().currentUser.email.replace(/^[^@]+/,'');
+          return firebase.database().ref('wildcards-accounts').child(userEmailDomain.replace(/\./g, '%2E')).once('value')
+            .then((snapshot) => {              
+              var wildcardGroupIds = snapshot.val();
+              //console.log('wildcardGroupIds', wildcardGroupIds);
+              if (wildcardGroupIds) Object.keys(wildcardGroupIds).forEach((groupId) => {
+                groupIds.push(groupId);
+              });
+              
+            })
+        })
+        .then(() => {
+          if (!groupIds || !groupIds.length) return Promise.resolve('No user accounts');
           else return Promise.all(
-            Object.keys(groupIds).map((groupId) => {
+            groupIds.map((groupId) => {
               return firebase.database().ref(this.modelName + '/' + groupId).once('value').then((snapshot) => {
                 var group = snapshot.val();
                 if (group) groups[groupId] = group;              
@@ -69,22 +87,6 @@ export default class BaseModel extends Model {
           )
           
         })
-        .then(() => {
-          var userEmailDomain = firebase.auth().currentUser.email.replace(/^[^@]+/,'');
-          return firebase.database().ref('wildcards-accounts').child(userEmailDomain.replace(/\./g, '%2E')).once('value')
-            .then((snapshot) => {
-              var groupId = snapshot.val();
-              if (groupId) return firebase.database().ref('accounts').child(groupId).once('value')
-                .then((groupSnapshot) => {
-                  if (groupSnapshot.val()) groups[groupId] = groupSnapshot.val();
-                  return Promise.resolve(groupSnapshot.val());
-                });
-              else return Promise.resolve('No group found for wildcard - a bit odd, but whatever...')
-            })            
-            .catch((err) => {
-              return Promise.resolve("No wildcard found - that's fine")
-            })
-        })        
         .then(function() {
           if (typeof(callback) == 'function') callback(groups);      
         })
