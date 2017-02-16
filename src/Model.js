@@ -73,7 +73,7 @@ export default class Model {
   
   remove(parentId, itemId, obj) {
     
-    if (typeof(obj) !== 'object' || !parentId || typeof(parentId) !== 'string' || !itemId || typeof(itemId) !== 'string') return Promise.reject('Invalid input provided to delete()')
+    if (typeof(obj) !== 'object' || !parentId || typeof(parentId) !== 'string' || !itemId || typeof(itemId) !== 'string') return Promise.reject('Invalid input provided to remove()')
     else {
       var updates = {};
     
@@ -204,7 +204,7 @@ export default class Model {
       
       return firebase.database().ref(refLocation).orderByChild(field).startAt(value.start).endAt(value.end).on('value', (snapshot) => {
         if (typeof(callback) == 'function') callback( snapshot.val()  );      
-      });        
+      });
     }
   };
   
