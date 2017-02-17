@@ -30,29 +30,36 @@ export default class BaseModel extends Model {
     ;
   };
   
-  remove(itemId, obj, updates) { 
-    if (!obj || typeof(obj) !== 'object') return Promise.reject('Invalid input provided to BaseModel.remove() - obj required')
-    else {
-      var updates = {};
-      return firebase.database().ref(`${this.modelName}-wildcards/${itemId}`).once('value')
-        .catch((err) => { 
-          // its okay to have no result here}
-        })
-        .then((snapshot) => {
-          var domain = snapshot.val();
-          if (domain) updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
-          
-          if (obj.members) obj.members.forEach((userId) => {
-            updates['users-' + this.modelName + '/' + userId + '/' + itemId] = null;
+  remove(itemId, updates) { 
+    var updates = {};
+    return firebase.database().ref(this.itemLocation()).once('value')
+      .then((snapshot) => {
+        return snapshot.val();
+      })
+      .then((item) => {
+        // do things with the actual deleting object here.
+        
+        // like cycle thru members prop and delete foreign refs
+        if (item.members) item.members.forEach((userId) => {
+          updates['users-' + this.modelName + '/' + userId + '/' + itemId] = null;
+        })        
+      })
+      .then(() => {
+        // look up external related things (not including )
+        return firebase.database().ref(`${this.modelName}-wildcards/${itemId}`).once('value')
+          .catch((err) => { 
+            // its okay to have no result here}
           })
-          
-          // scan/search or invites/email-based memberships would go in a then() here
-          
-          return super.remove('root', itemId, obj, updates)          
-      
-        })
+          .then((snapshot) => {
+            var domain = snapshot.val();
+            if (domain) updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
+          })
+      })
+      .then(() => {
+        return super.remove('root', itemId, updates)          
+        
+      })
     
-    }
   };
   
   get(itemId, callback) {

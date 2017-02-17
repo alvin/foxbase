@@ -71,72 +71,79 @@ export default class Model {
     else return Promise.reject('Oops, ' + this.modelName + ' has no class name -- is your ES2016 parsing setup correctly?')   
   };
   
-  remove(parentId, itemId, obj, updates) {
+  remove(parentId, itemId, updates) {
     
-    if (typeof(obj) !== 'object' || !parentId || typeof(parentId) !== 'string' || !itemId || typeof(itemId) !== 'string') return Promise.reject('Invalid input provided to remove()')
+    if (!parentId || typeof(parentId) !== 'string' || !itemId || typeof(itemId) !== 'string') return Promise.reject('Invalid input provided to remove()')
     else {
-      if (typeof(updates) == 'undefined') updates = {};
+      if (typeof(updates) != 'object') updates = {};
       
       var blobRefs = [];
-      var scanRefs = {};
+      var childRefs = {};
       
       if (this.options.rootChildren) this.options.rootChildren.forEach((childModelName) => {      
       
         const childModel = models[childModelName];
-        const childrenRef = childModel.itemLocation(parentId,itemId);
-        scanRefs[childModelName] = childrenRef;
-        updates[childrenRef] = null;  
+        const childRef = childModel.itemLocation(parentId,itemId);
+        childRefs[childModelName] = childRef;
+        updates[childRef] = null;  
               
       
       });
       
-      // comb thru existing object looking for blobs
-      if (this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
-        if (obj[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}.jpg`);
-      });                
-      
-      
-      // comb thru all child items looking for populated blob values
-      // add said locations to blobRefs[] for deletion below post update()
-      return Promise.all(
-        _.map(Object.keys(scanRefs).forEach((modelName) => {
-          const ref = scanRefs[modelName];
-          const model = models[modelName];
+      return firebase.database().ref(this.itemLocation(parentId,itemId)).once('value')
+        .then((snapshot) => {
+          var item = snapshot.val();
+          // comb thru existing object looking for blobs
+          if (item && this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
+            if (item[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}.jpg`);
+          });                
+        
+        })
+        .then(() => {
+          // comb thru all child items looking for populated blob values
+          // add said locations to blobRefs[] for deletion below post update()
+          return Promise.all(
+            _.map(Object.keys(childRefs).forEach((modelName) => {
+              const ref = childRefs[modelName];
+              const model = models[modelName];
           
-          return firebase.database().ref(ref).once('value')
-            .then((snapshot) => {
-              var itemIds = [];      
-              var items = snapshot.val();
+              return firebase.database().ref(ref).once('value')
+                .then((snapshot) => {
+                  var itemIds = [];      
+                  var items = snapshot.val();
               
-              if (items) Object.keys(items).forEach((itemId) => {
-                if (model.options.blobFields && Array.isArray(model.options.blobFields)) model.options.blobFields.forEach((blobKey) => {
-                  var item = items[itemId];
-                  if (item[blobKey]) blobRefs.push(`${ref}/${itemId}/${blobKey}.jpg`);
-                });                
-              })
+                  if (items) Object.keys(items).forEach((itemId) => {
+                    if (model.options.blobFields && Array.isArray(model.options.blobFields)) model.options.blobFields.forEach((blobKey) => {
+                      var item = items[itemId];
+                      if (item[blobKey]) blobRefs.push(`${ref}/${itemId}/${blobKey}.jpg`);
+                    });                
+                  })
+                })
+            }))
+          )
+        
+        })
+        .then(() => {
+    
+          updates[this.itemLocation(parentId, itemId)] = null;
+    
+          return firebase.database().ref().update(updates)
+            .then(() => {
+               return Promise.all(
+                _.map(blobRefs, (blobRef) => {
+                  return firebase.storage().ref().child(blobRef).delete()
+                  .then(() => {
+                    //console.log(blobRef + " deleted.")
+                    // File deleted successfully
+                  }).catch((e) => {
+                    console.log(e)
+                  });
+              
+                })
+              )
             })
-        }))
-      ).then(() => {
-    
-        updates[this.itemLocation(parentId, itemId)] = null;
-    
-        return firebase.database().ref().update(updates)
-          .then(() => {
-             return Promise.all(
-              _.map(blobRefs, (blobRef) => {
-                return firebase.storage().ref().child(blobRef).delete()
-                .then(() => {
-                  console.log(blobRef + " deleted.")
-                  // File deleted successfully
-                }).catch((e) => {
-                  console.log(e)
-                });
-              
-              })
-            )
-          })
       
-      })
+        })
       
     }    
   };  

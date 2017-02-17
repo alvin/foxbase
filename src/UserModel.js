@@ -17,7 +17,7 @@ export default class UserModel extends Model {
   
   create(obj, blobs) { return super.create(this.currentUid(), obj, blobs) }
   
-  remove(itemId, obj) { return super.remove(this.currentUid(), itemId, obj) }
+  remove(itemId) { return super.remove(this.currentUid(), itemId) }
   
   get(itemId, callback) { return super.get(this.currentUid(), itemId, callback) }
   
