@@ -23,7 +23,7 @@ export default class Model {
   write(parentId, itemId, obj, blobs) {    
     //console.log('write() input: ', parentId, itemId, obj, blobs);
     
-    if (!parentId || !itemId || typeof(parentId) != 'string' || ( typeof(obj) != 'object' && typeof(obj) != 'null' ) || typeof(itemId) != 'string' ) return Promise.reject('Invalid input provided to write()')        
+    if (!parentId || !itemId || typeof(parentId) != 'string' || ( typeof(obj) != 'object' && typeof(obj) != 'null' && typeof(obj) != 'string' ) || typeof(itemId) != 'string' ) return Promise.reject('Invalid input provided to write()')        
     else return firebase.database().ref(this.itemLocation(parentId, itemId)).set(obj).then(() => {
       return this.uploadBlobs(parentId, itemId, obj, blobs);
     })

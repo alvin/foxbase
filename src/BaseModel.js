@@ -10,9 +10,13 @@ export default class BaseModel extends Model {
     return this.modelName;
   }
   
-  write(itemId, obj, blobs) { return super.write('root', itemId, obj, blobs) }
+  write(itemId, obj, blobs) { 
+    return super.write('root', itemId, obj, blobs) 
+  }
   
-  patch(itemId, obj, blobs) { return super.patch('root', itemId, obj, blobs) }
+  patch(itemId, obj, blobs) { 
+    return super.patch('root', itemId, obj, blobs) 
+  }
     
   create(obj, blobs) { 
     if (typeof(obj) == 'object' && firebase.auth().currentUser) obj.members = [firebase.auth().currentUser.uid];    
@@ -28,15 +32,24 @@ export default class BaseModel extends Model {
   
   remove(itemId, obj) { 
     if (!obj || typeof(obj) !== 'object') return Promise.reject('Invalid input provided to BaseModel.remove() - obj required')
-    else return super.remove('root', itemId, obj)
-      .then((groupId) => { // remove the user-referenced registry entries for this base model
-        var updates = {};
-        if (obj.members) obj.members.forEach((userId) => {
-          updates['/users-' + this.modelName + '/' + userId + '/' + itemId] = null;
-        });
-        return firebase.database().ref().update(updates)
+    else {
+      var updates = {};
+      if (obj.domains) obj.domains.forEach((domain) => {
+        updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
       })
-    ;  
+      if (obj.members) obj.members.forEach((userId) => {
+        updates['/users-' + this.modelName + '/' + userId + '/' + itemId] = null;
+      })
+      
+      return firebase.database().ref().update(updates) 
+        .catch((err) => { 
+          // maybe there were some issues deleting sub-resources, lets keep going
+        })
+        .then(() => {
+          return super.remove('root', itemId, obj)          
+        });
+    
+    }
   };
   
   get(itemId, callback) {
@@ -87,11 +100,12 @@ export default class BaseModel extends Model {
           )
           
         })
-        .then(function() {
-          if (typeof(callback) == 'function') callback(groups);      
-        })
         .catch((err) => {
           console.log("error in load() ", err);
+          return true
+        })
+        .then(function() {
+          if (typeof(callback) == 'function') callback(groups);      
         })
         
               
