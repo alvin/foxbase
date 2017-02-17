@@ -11,7 +11,7 @@ export default class Model {
   }
   
   parentLocation(parentId) {
-    //if (this.parentModelName == 'root' || parentId == 'root') return this.modelName;
+    if (this.parentModelName == 'root' || parentId == 'root') return `${this.parentModelName}-${this.modelName}`;
     if (this.isNested()) return `${this.parentModelName}/${parentId}/${this.modelName}`;
     else return  `${this.parentModelName}-${this.modelName}/${parentId}`;  
   }
@@ -71,60 +71,75 @@ export default class Model {
     else return Promise.reject('Oops, ' + this.modelName + ' has no class name -- is your ES2016 parsing setup correctly?')   
   };
   
-  remove(parentId, itemId, obj) {
+  remove(parentId, itemId, obj, updates) {
     
     if (typeof(obj) !== 'object' || !parentId || typeof(parentId) !== 'string' || !itemId || typeof(itemId) !== 'string') return Promise.reject('Invalid input provided to remove()')
     else {
-      var updates = {};
-    
-      // delete child model contents with this id (do this before committing delete of parent to reduce orphans due to transport interrupt)
+      if (typeof(updates) == 'undefined') updates = {};
+      
+      var blobRefs = [];
+      var scanRefs = {};
+      
       if (this.options.rootChildren) this.options.rootChildren.forEach((childModelName) => {      
-
-        var childLocation = parentId + '/' + itemId;
-        if (parentId == "root") childLocation = itemId;            
-        if (typeof(models[childModelName]) == "object") models[childModelName].removeAllChildren(childLocation);
       
-        // two lines below actually include the child model in one transaction with the parent
-        // which is better, but won't account for blob removal.
-        // should create a getRemoveUpdates method that returns a list of database + storage nodes to remove for an object
-        // to restore atomic-ish-ness
-      
-        //var Model = models[this.modelName];
-        //updates[Model.itemLocation(parentId,itemId)] = null;      
-      
-        // switching to a recursive model .remove() call for blob cleanup (not transactional)
-
+        const childModel = models[childModelName];
+        const childrenRef = childModel.itemLocation(parentId,itemId);
+        scanRefs[childModelName] = childrenRef;
+        updates[childrenRef] = null;  
+              
       
       });
+      
+      // comb thru existing object looking for blobs
+      if (this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
+        if (obj[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}.jpg`);
+      });                
+      
+      
+      // comb thru all child items looking for populated blob values
+      // add said locations to blobRefs[] for deletion below post update()
+      return Promise.all(
+        _.map(Object.keys(scanRefs).forEach((modelName) => {
+          const ref = scanRefs[modelName];
+          const model = models[modelName];
+          
+          return firebase.database().ref(ref).once('value')
+            .then((snapshot) => {
+              var itemIds = [];      
+              var items = snapshot.val();
+              
+              if (items) Object.keys(items).forEach((itemId) => {
+                if (model.options.blobFields && Array.isArray(model.options.blobFields)) model.options.blobFields.forEach((blobKey) => {
+                  var item = items[itemId];
+                  if (item[blobKey]) blobRefs.push(`${ref}/${itemId}/${blobKey}.jpg`);
+                });                
+              })
+            })
+        }))
+      ).then(() => {
     
-      updates[this.itemLocation(parentId, itemId)] = null;
+        updates[this.itemLocation(parentId, itemId)] = null;
     
-      return firebase.database().ref().update(updates).then(() => {
-        // delete blobField objects with this id      
-        if (obj && this.options.blobFields) this.deleteBlobs(parentId, itemId, obj)
-        else return Promise.resolve('no blobFields defined in model');
+        return firebase.database().ref().update(updates)
+          .then(() => {
+             return Promise.all(
+              _.map(blobRefs, (blobRef) => {
+                return firebase.storage().ref().child(blobRef).delete()
+                .then(() => {
+                  console.log(blobRef + " deleted.")
+                  // File deleted successfully
+                }).catch((e) => {
+                  console.log(e)
+                });
+              
+              })
+            )
+          })
+      
       })
       
     }    
-  };
-  
-  removeAllChildren(parentId) {
-    
-    return firebase.database().ref( this.parentLocation(parentId) ).once('value').then((snapshot) => {
-      var itemIds = [];      
-      var items = snapshot.val();
-      if (items) itemIds = Object.keys(items);
-      
-      return Promise.all(
-        itemIds.map((itemId) => {
-          return this.remove(parentId, itemId, items[itemId])
-        })
-      );
-      //else return Promise.resolve('no child objects for ' + parentId + " " + this.modelName)  
-    })
-    
-  };
-  
+  };  
   
   uploadBlobs(parentId, itemId, obj, blobs) {
     if (blobs && typeof(blobs) == "object") return Promise.all(
@@ -147,29 +162,6 @@ export default class Model {
       })
     );
     else return Promise.resolve(obj)    
-  };
-  
-  deleteBlobs(parentId, itemId, obj) {
-    // only delete blobs that exist in the obj
-    var populatedBlobs = [];
-    
-    if (this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
-      if (obj[blobKey]) populatedBlobs.push(blobKey);
-    });    
-    
-    if (populatedBlobs.length) return Promise.all(
-      populatedBlobs.map((blobKey) => {
-  
-        var imageRef = firebase.storage().ref().child(this.itemLocation(parentId, itemId) + '/' + blobKey + ".jpg");      
-        return imageRef.delete().then(() => {
-          // File deleted successfully
-        }).catch((e) => {
-          console.log(e)
-        });
-        
-      })
-    );
-    else return Promise.resolve('No blob fields to delete')    
   };
   
   load(parentId, callback) {    

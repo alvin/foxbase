@@ -30,24 +30,27 @@ export default class BaseModel extends Model {
     ;
   };
   
-  remove(itemId, obj) { 
+  remove(itemId, obj, updates) { 
     if (!obj || typeof(obj) !== 'object') return Promise.reject('Invalid input provided to BaseModel.remove() - obj required')
     else {
       var updates = {};
-      if (obj.domains) obj.domains.forEach((domain) => {
-        updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
-      })
-      if (obj.members) obj.members.forEach((userId) => {
-        updates['/users-' + this.modelName + '/' + userId + '/' + itemId] = null;
-      })
-      
-      return firebase.database().ref().update(updates) 
+      return firebase.database().ref(`${this.modelName}-wildcards/${itemId}`).once('value')
         .catch((err) => { 
-          // maybe there were some issues deleting sub-resources, lets keep going
+          // its okay to have no result here}
         })
-        .then(() => {
-          return super.remove('root', itemId, obj)          
-        });
+        .then((snapshot) => {
+          var domain = snapshot.val();
+          if (domain) updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
+          
+          if (obj.members) obj.members.forEach((userId) => {
+            updates['users-' + this.modelName + '/' + userId + '/' + itemId] = null;
+          })
+          
+          // scan/search or invites/email-based memberships would go in a then() here
+          
+          return super.remove('root', itemId, obj, updates)          
+      
+        })
     
     }
   };
