@@ -38,7 +38,7 @@ export default class BaseModel extends Model {
     return firebase.database().ref(`${this.modelName}/${itemId}`).once('value')
       .then((snapshot) => {
         var item = snapshot.val();
-        if (item.domain) updates[`wildcards-${this.modelName}/${item.domain.replace(/\./g,'%2E')}/${itemId}`] = null;
+        if (item.wildcard) updates[`wildcards-${this.modelName}/${item.wildcard.replace(/\./g,'%2E')}/${itemId}`] = null;
         
         if (item) Object.keys(item.members).forEach((email) => {
           updates[`emails-${this.modelName}/${email}/${itemId}`] = null;            
