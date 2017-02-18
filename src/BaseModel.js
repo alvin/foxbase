@@ -6,9 +6,9 @@ export default class BaseModel extends Model {
       super('root', modelName, options);
   }
   
-  parentLocation(parentId) {
-    return this.modelName;
-  }
+  parentLocation(parentId) {  return this.modelName; }
+  
+  itemLocation(itemId) { return `${this.modelName}/${itemId}`; };  
   
   write(itemId, obj, blobs) { 
     return super.write('root', itemId, obj, blobs) 
@@ -37,13 +37,10 @@ export default class BaseModel extends Model {
   
   remove(itemId, updates) { 
     var updates = {};
-    return firebase.database().ref(`${this.modelName}-emails/${itemId}`).once('value')
-      .catch((err) => { 
-        // its okay to have no result here}
-      })
+    return firebase.database().ref(this.itemLocation(itemId)).once('value')
       .then((snapshot) => {
-        var emails = snapshot.val();
-        if (emails) Object.keys(emails).forEach((email) => {
+        var item = snapshot.val();
+        if (item) Object.keys(item.members).forEach((email) => {
           updates[`emails-${this.modelName}/${email}/${itemId}`] = null;            
         })
       })
