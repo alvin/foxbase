@@ -1,6 +1,6 @@
 {
   "name": "foxbase",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "A lightweight model/lifecycle library for Google's Firebase. Includes child relationships and blob associations (i.e. for images/attachements)",
   "main": "lib/index.js",
   "scripts": {

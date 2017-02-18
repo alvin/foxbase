@@ -23,8 +23,9 @@ export default class BaseModel extends Model {
     return super.create('root', obj, blobs) // update the user-referenced registry for this base model
       .then((groupId) => {
         var currentUid = firebase.auth().currentUser.uid;
+        var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
         var updates = {};
-        updates['users-' + this.modelName + '/' + currentUid + '/' + groupId ] = 'admin';      
+        updates['emails-' + this.modelName + '/' + currentUid + '/' + groupId ] = 'admin';      
         return firebase.database().ref().update(updates)      
       })
     ;
@@ -41,7 +42,8 @@ export default class BaseModel extends Model {
         
         // like cycle thru members prop and delete foreign refs
         if (item.members) item.members.forEach((userId) => {
-          updates['users-' + this.modelName + '/' + userId + '/' + itemId] = null;
+          var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
+          updates['emails-' + this.modelName + '/' + currentEmailRef + '/' + itemId] = null;          
         })        
       })
       .then(() => {
@@ -77,18 +79,19 @@ export default class BaseModel extends Model {
     else {
       var groupIds = []
       var groups = {};
-      
-      return firebase.database().ref('/users-' + this.modelName +'/' + currentUser.uid).once('value')
-        .then((snapshot) => {
-          var userGroupIds = snapshot.val();
-          //console.log('userGroupIds', userGroupIds);
-          if (userGroupIds) Object.keys(userGroupIds).forEach((groupId) => {
+
+      var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
+      return firebase.database().ref(`emails-${this.modelName}`).child(currentEmailRef).once('value')
+        .then((snapshot) => {              
+          var emailGroupIds = snapshot.val();
+          //console.log('wildcardGroupIds', wildcardGroupIds);
+          if (emailGroupIds) Object.keys(emailGroupIds).forEach((groupId) => {
             groupIds.push(groupId);
           });
         })
         .then(() => {
           var userEmailDomain = firebase.auth().currentUser.email.replace(/^[^@]+/,'');
-          return firebase.database().ref('wildcards-accounts').child(userEmailDomain.replace(/\./g, '%2E')).once('value')
+          return firebase.database().ref(`wildcards-${this.modelName}`).child(userEmailDomain.replace(/\./g, '%2E')).once('value')
             .then((snapshot) => {              
               var wildcardGroupIds = snapshot.val();
               //console.log('wildcardGroupIds', wildcardGroupIds);
