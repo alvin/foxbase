@@ -7,9 +7,7 @@ export default class BaseModel extends Model {
   }
   
   parentLocation(parentId) {  return this.modelName; }
-  
-  itemLocation(itemId) { return `${this.modelName}/${itemId}`; };  
-  
+    
   write(itemId, obj, blobs) { 
     return super.write('root', itemId, obj, blobs) 
   }
@@ -37,23 +35,16 @@ export default class BaseModel extends Model {
   
   remove(itemId, updates) { 
     var updates = {};
-    return firebase.database().ref(this.itemLocation(itemId)).once('value')
+    return firebase.database().ref(`${this.modelName}/${itemId}`).once('value')
       .then((snapshot) => {
         var item = snapshot.val();
+        if (item.domain) updates[`wildcards-${this.modelName}/${item.domain.replace(/\./g,'%2E')}/${itemId}`] = null;
+        
         if (item) Object.keys(item.members).forEach((email) => {
           updates[`emails-${this.modelName}/${email}/${itemId}`] = null;            
         })
-      })
-      .then(() => {
-        // look up external related things (not including )
-        return firebase.database().ref(`${this.modelName}-wildcards/${itemId}`).once('value')
-          .catch((err) => { 
-            // its okay to have no result here}
-          })
-          .then((snapshot) => {
-            var domain = snapshot.val();
-            if (domain) updates[`wildcards-${this.modelName}/${domain.replace(/\./g,'%2E')}/${itemId}`] = null;
-          })
+        
+        
       })
       .then(() => {
         console.log('pre-updates', updates);
