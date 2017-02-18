@@ -54,6 +54,7 @@ export default class Model {
       if (typeof(this.options) == 'object') {
         if (this.options.createdAt) obj.createdAt = firebase.database.ServerValue.TIMESTAMP;
         if (this.options.createdById) obj.createdById = firebase.auth().currentUser.uid;
+        if (this.options.createdByEmail) obj.createdByEmail = firebase.auth().currentUser.email;
         if (this.options.createdBy) obj.createdBy = { 
           id: firebase.auth().currentUser.uid,
           displayName: firebase.auth().currentUser.displayName,
@@ -126,7 +127,6 @@ export default class Model {
         .then(() => {
     
           updates[this.itemLocation(parentId, itemId)] = null;
-    
           return firebase.database().ref().update(updates)
             .then(() => {
                return Promise.all(

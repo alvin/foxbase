@@ -19,13 +19,12 @@ export default class BaseModel extends Model {
   }
     
   create(obj, blobs) { 
-    if (typeof(obj) == 'object' && firebase.auth().currentUser) obj.members = [firebase.auth().currentUser.uid];    
     return super.create('root', obj, blobs) // update the user-referenced registry for this base model
       .then((groupId) => {
         var currentUid = firebase.auth().currentUser.uid;
         var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
         var updates = {};
-        updates['emails-' + this.modelName + '/' + currentUid + '/' + groupId ] = 'admin';      
+        updates['emails-' + this.modelName + '/' + currentEmailRef + '/' + groupId ] = 'admin';      
         return firebase.database().ref().update(updates)      
       })
     ;
@@ -33,18 +32,15 @@ export default class BaseModel extends Model {
   
   remove(itemId, updates) { 
     var updates = {};
-    return firebase.database().ref(this.itemLocation()).once('value')
-      .then((snapshot) => {
-        return snapshot.val();
+    return firebase.database().ref(`${this.modelName}-emails/${itemId}`).once('value')
+      .catch((err) => { 
+        // its okay to have no result here}
       })
-      .then((item) => {
-        // do things with the actual deleting object here.
-        
-        // like cycle thru members prop and delete foreign refs
-        if (item.members) item.members.forEach((userId) => {
-          var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
-          updates['emails-' + this.modelName + '/' + currentEmailRef + '/' + itemId] = null;          
-        })        
+      .then((snapshot) => {
+        var emails = snapshot.val();
+        if (emails) Object.keys(emails).forEach((email) => {
+          updates[`emails-${this.modelName}/${email}/${itemId}`] = null;            
+        })
       })
       .then(() => {
         // look up external related things (not including )
@@ -58,6 +54,7 @@ export default class BaseModel extends Model {
           })
       })
       .then(() => {
+        console.log('pre-updates', updates);
         return super.remove('root', itemId, updates)          
         
       })
