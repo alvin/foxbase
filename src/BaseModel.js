@@ -19,7 +19,11 @@ export default class BaseModel extends Model {
   }
     
   create(obj, blobs) { 
-    if (typeof(obj) == 'object' && firebase.auth().currentUser) obj.members = [firebase.auth().currentUser.email];
+    if (typeof(obj) == 'object' && firebase.auth().currentUser && !obj.members) { 
+      var currentEmailRef = firebase.auth().currentUser.email.replace(/\./g, '%2E');
+      obj.members = {};      
+      obj.members[currentEmailRef] = 'admin';
+    }
     return super.create('root', obj, blobs) // update the user-referenced registry for this base model
       .then((groupId) => {
         var currentUid = firebase.auth().currentUser.uid;
