@@ -1,6 +1,7 @@
 // CRUD for a child model
 // pass { nested: true } as the 3rd options  parameter if you want 
 // items to live within the parent vs. in a root 
+//import slugify from 'underscore.string';
 
 export default class Model {
   
@@ -18,16 +19,86 @@ export default class Model {
   
   itemLocation(parentId, itemId) { return this.parentLocation(parentId) + '/' + itemId };  
   
+  resolveForeignPath(parentId, itemId, field, fieldValue) {
+    var parentPath = `${parentId ? parentId : ''}/`
+    if (typeof(parentId) == 'undefined' || parentId == 'root') parentPath = '';
+    return `${field}-${this.modelName}/${parentPath}${fieldValue}/${itemId}`
+  }
+  
   isNested() { return typeof(this.options) == "object" && this.options.nested };
+  
+  getForeignRefUpdates(parentId, itemId, obj) {
+    var refUpdates = {};
+    
+    if (this.options.foreignIdRefs) this.options.foreignIdRefs.forEach((field) => {      
+      if (obj && typeof(obj) == 'object' && typeof(obj[field]) != 'undefined' ) {
+        if (obj[field] && obj[field].length) obj[field].forEach((value, idx) => {
+          refUpdates[this.resolveForeignPath(parentId, itemId, field, value)] = true;            
+        })
+      }
+            
+    });
+    return refUpdates;
+  }
+
+  preprocessForeignRefs(parentId, itemId, obj) {
+    if (!this.options.foreignIdRefs) return Promise.resolve(obj);
+    else {
+      return firebase.database().ref(this.itemLocation(parentId,itemId)).once('value')
+        .then((snapshot) => {
+          
+          var item = snapshot.val();
+          var removeRefs = {};
+          
+          if (item) {
+            
+            this.options.foreignIdRefs.forEach((field) => {      
+              if (item && typeof(item) == 'object' && typeof(item[field]) != 'undefined' ) {
+                if (item[field] && item[field].length) item[field].forEach((value, idx) => {
+                  if (!obj.field || !obj[field].includes(value)) { // the old value is gone or isn't in the new array, delete the foreign ref!
+                    removeRefs[this.resolveForeignPath(parentId, itemId, field, value)] = null;                            
+                  }
+                })
+              }            
+            });
+            
+            
+          }
+          
+          return firebase.database().ref().update( removeRefs);
+          
+        })
+        .catch((e) => {
+          console.log(e);
+        })
+        
+    }
+   
+  }
   
   write(parentId, itemId, obj, blobs) {    
     //console.log('write() input: ', parentId, itemId, obj, blobs);
     
-    if (!parentId || !itemId || typeof(parentId) != 'string' || ( typeof(obj) != 'object' && typeof(obj) != 'null' && typeof(obj) != 'string' ) || typeof(itemId) != 'string' ) return Promise.reject('Invalid input provided to write()')        
-    else return firebase.database().ref(this.itemLocation(parentId, itemId)).set(obj).then(() => {
-      return this.uploadBlobs(parentId, itemId, obj, blobs);
-    })
+    if (!parentId || !itemId || typeof(parentId) != 'string' || ( typeof(obj) != 'object' && typeof(obj) != 'null' && typeof(obj) != 'string'&& typeof(obj) != 'boolean' ) || typeof(itemId) != 'string' ) { 
+      return Promise.reject('Invalid input provided to write()');
+    } else { 
+      
+        return this.preprocessForeignRefs(parentId, itemId, obj).then(() => {
+          return firebase.database().ref(this.itemLocation(parentId, itemId)).set( obj )                 
+        })
+        .then(() => {
+          return firebase.database().ref().update( this.getForeignRefUpdates(parentId, itemId, obj) )          
+        })
+        .then(() => {
+          return this.uploadBlobs(parentId, itemId, obj, blobs);
+        })
+        .catch((e) => {
+          console.log(e);
+        });  
+      
+    }
   };
+  
   
   patch(parentId, itemId, obj, blobs) {
     //console.log('parentid ' + parentId, 'itemId ' + itemId, 'obj ' + obj, 'blobs ' + blobs);
@@ -38,12 +109,18 @@ export default class Model {
       Object.keys(obj).forEach((key) => {
         updates[this.itemLocation(parentId, itemId) + '/' + key] = obj[key];      
       });
+
+      updates = Object.assign(updates, this.getForeignRefUpdates(parentId, itemId, obj));
       
       //console.log('updates', updates);
-      return firebase.database().ref().update(updates).then(() => {        
-        if (blobs) return this.uploadBlobs(parentId, itemId, obj, blobs);
-        else return obj
-      })
+      return this.preprocessForeignRefs(parentId, itemId, obj)
+        .then(() => {
+          return firebase.database().ref().update(updates)
+        })
+        .then(() => {        
+          if (blobs) return this.uploadBlobs(parentId, itemId, obj, blobs);
+          else return obj
+        })
     }
   };
   
@@ -66,9 +143,10 @@ export default class Model {
       }
     };
     
-    if (this.constructor.name == 'Model') return this.write(parentId, newId, obj, blobs).then((result) => {
-      return newId
-    });
+    if (this.constructor.name == 'Model') return this.write(parentId, newId, obj, blobs)
+      .then((result) => {
+        return newId
+      });
     else if (['BaseModel','UserModel'].includes(this.constructor.name)) return this.write(newId, obj, blobs).then((result) => {
       return newId
     });
@@ -93,10 +171,26 @@ export default class Model {
               
       
       });
+
       
       return firebase.database().ref(this.itemLocation(parentId,itemId)).once('value')
         .then((snapshot) => {
           var item = snapshot.val();
+          return item;
+        })
+        .then((item) => {
+          if (this.options.foreignIdRefs) this.options.foreignIdRefs.forEach((field) => {      
+            if (typeof(field) == "string" && item && item[field]) {              
+              if (item && item[field].length) item[field].forEach((fieldValue, idx) => {
+                var foreignPath = this.resolveForeignPath(parentId, itemId, field, fieldValue);                
+                updates[foreignPath] = null;            
+              })
+            }
+          });
+          return item;
+          
+        })
+        .then((item) => {
           // comb thru existing object looking for blobs
           if (item && this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
             if (item[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}.jpg`);
