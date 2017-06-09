@@ -49,7 +49,10 @@ export default class Model {
   
   create(parentId, obj, blobs) {
     var newId = obj.id || firebase.database().ref().child(this.parentLocation(parentId)).push().key;
-    
+    if (typeof(obj.id) == 'string' && !this.options.keepIdProp) { 
+      if (_.size(obj) == 1) obj = true;
+      else delete(obj.id);
+    }
     if (typeof(obj) == "object") {
       if (typeof(this.options) == 'object') {
         if (this.options.createdAt) obj.createdAt = firebase.database.ServerValue.TIMESTAMP;
