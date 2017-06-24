@@ -193,7 +193,9 @@ export default class Model {
         .then((item) => {
           // comb thru existing object looking for blobs
           if (item && this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
-            if (item[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}.jpg`);
+            var blobItem = item[blobKey];
+            var filename = blobItem.name
+            if (blobItem) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}`);
           });                
         
         })
@@ -213,7 +215,7 @@ export default class Model {
                   if (items) Object.keys(items).forEach((itemId) => {
                     if (model.options.blobFields && Array.isArray(model.options.blobFields)) model.options.blobFields.forEach((blobKey) => {
                       var item = items[itemId];
-                      if (item[blobKey]) blobRefs.push(`${ref}/${itemId}/${blobKey}.jpg`);
+                      if (item[blobKey]) blobRefs.push(`${ref}/${itemId}/${blobKey}`);
                     });                
                   })
                 })
@@ -250,9 +252,9 @@ export default class Model {
       Object.keys(blobs).map((blobKey) => {
         var blob = blobs[blobKey];
   
-        var imageRef = firebase.storage().ref().child(this.itemLocation(parentId, itemId) + '/' + blobKey + ".jpg");      
-  
-        return imageRef.put(blob, {contentType: 'image/jpeg'}).then((result) => {
+        var imageRef = firebase.storage().ref().child(this.itemLocation(parentId, itemId) + '/' + blobKey );      
+        //{contentType: 'image/jpeg'}
+        return imageRef.put(blob, {}).then((result) => {
           var addImageUpdate = {};          
           obj[blobKey] = result.downloadURL;
           addImageUpdate[this.itemLocation(parentId, itemId) + '/' + blobKey] = result.downloadURL;
