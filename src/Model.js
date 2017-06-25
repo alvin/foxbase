@@ -193,9 +193,7 @@ export default class Model {
         .then((item) => {
           // comb thru existing object looking for blobs
           if (item && this.options.blobFields && Array.isArray(this.options.blobFields)) this.options.blobFields.forEach((blobKey) => {
-            var blobItem = item[blobKey];
-            var filename = blobItem.name
-            if (blobItem) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}`);
+            if (item[blobKey]) blobRefs.push(`${this.itemLocation(parentId,itemId)}/${blobKey}`);
           });                
         
         })
