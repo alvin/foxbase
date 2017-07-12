@@ -55,10 +55,11 @@ export default class BaseModel extends Model {
   };
   
   get(itemId, callback) {
-    
-    return firebase.database().ref(this.modelName + '/' + itemId).on('value', (snapshot) => {
+    const ref = firebase.database().ref(this.modelName + '/' + itemId);
+    ref.on('value', (snapshot) => {
       if (typeof(callback) == 'function') callback( snapshot.val() );      
     });
+    return ref;
     
   };
   
@@ -118,5 +119,3 @@ export default class BaseModel extends Model {
   find(query, callback)  { return super.find('root', query, callback) };
   
 }
-
-

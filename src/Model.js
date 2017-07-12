@@ -271,10 +271,11 @@ export default class Model {
   load(parentId, callback) {    
     var refLocation = this.parentLocation(parentId);
     //console.log('load() refLocation',refLocation);
-    
-    return firebase.database().ref(refLocation).on('value', (snapshot) => {
+    const ref = firebase.database().ref(refLocation);
+    ref.on('value', (snapshot) => {
       if (typeof(callback) == 'function') callback( snapshot.val()  );      
     });
+    return ref;
   };
   
   find(parentId, query, callback) {    
@@ -297,10 +298,13 @@ export default class Model {
         // do it.
       });
       */
+      const ref = firebase.database().ref(refLocation);
       
-      return firebase.database().ref(refLocation).orderByChild(field).startAt(value.start).endAt(value.end).on('value', (snapshot) => {
+      ref.orderByChild(field).startAt(value.start).endAt(value.end).on('value', (snapshot) => {
         if (typeof(callback) == 'function') callback( snapshot.val()  );      
       });
+      return ref;
+      
     }
   };
   
@@ -308,9 +312,10 @@ export default class Model {
     //console.log('get(parentId, itemId, callback) params: ', parentId, itemId, callback)
     var refLocation = this.itemLocation(parentId, itemId);
     //console.log('get() refLocation',refLocation);
-      
-    return firebase.database().ref(refLocation).on('value', (snapshot) => {
+    const ref = firebase.database().ref(refLocation);
+    ref.on('value', (snapshot) => {
       if (typeof(callback) == 'function') callback( snapshot.val() );      
     });
+    return ref;
   };
 }
