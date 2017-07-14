@@ -55,7 +55,7 @@ export default class Model {
             this.options.foreignIdRefs.forEach((field) => {      
               if (item && typeof(item) == 'object' && typeof(item[field]) != 'undefined' ) {
                 if (item[field] && item[field].length) item[field].forEach((value, idx) => {
-                  if ( (typeof(obj[field]) != 'undefined' && !obj[field]) || !obj[field].includes(value)) { // the old value is gone or isn't in the new array, delete the foreign ref!
+                  if ( (typeof(obj[field]) != 'undefined' && !obj[field]) || (_.isArray(obj[field]) && !obj[field].includes(value)) ) { // the old value is gone or isn't in the new array, delete the foreign ref!
                     removeRefs[this.resolveForeignPath(parentId, itemId, field, value)] = null;                            
                   }
                 })
